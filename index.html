@@ -1,6 +1,31 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+<script>/* Short material sounds. No melodic fanfares; all effects decay within 450 ms. */
+window.TableSound=(()=>{
+ const P={"hit": 135, "rub": 1700, "note": 280};
+ let ac=null,lastTap=-1;const voices=new Set(),guards=[];
+ function context(){try{if(!ac){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;ac=new C()}if(ac.state==='suspended')ac.resume().catch(()=>{});return ac}catch{return null}}
+ function track(node,g){voices.add(node);node.onended=()=>{voices.delete(node);node.disconnect();g.disconnect()}}
+ function stop(){for(const node of voices)try{node.stop()}catch{}voices.clear()}
+ function modal(f,d,v,at=0){const c=context();if(!c)return;const t=c.currentTime+at;[[1,1],[2.76,.2],[4.8,.055]].forEach(([ratio,amp])=>{const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=f*ratio;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(Math.max(.0002,v*amp),t+.003);g.gain.exponentialRampToValueAtTime(.0001,t+d/Math.sqrt(ratio));o.connect(g);g.connect(c.destination);track(o,g);o.start(t);o.stop(t+d+.01)})}
+ function friction(d,f,v,at=0){const c=context();if(!c)return;const t=c.currentTime+at,len=Math.ceil(c.sampleRate*d),b=c.createBuffer(1,len,c.sampleRate),data=b.getChannelData(0);let previous=0;for(let i=0;i<len;i++){previous=.65*previous+.35*(Math.random()*2-1);data[i]=previous*Math.sin(Math.PI*i/len)**1.4}const src=c.createBufferSource(),filter=c.createBiquadFilter(),g=c.createGain();src.buffer=b;filter.type='bandpass';filter.frequency.value=f;filter.Q.value=.65;g.gain.value=v;src.connect(filter);filter.connect(g);g.connect(c.destination);voices.add(src);src.onended=()=>{voices.delete(src);src.disconnect();filter.disconnect();g.disconnect()};src.start(t)}
+ function pluck(f,d,v,at=0){const c=context();if(!c)return;const t=c.currentTime+at;[1,2,3,4].forEach((h,i)=>{const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.value=f*h;g.gain.setValueAtTime(v/(h*h),t);g.gain.exponentialRampToValueAtTime(.0001,t+d/(1+i*.4));o.connect(g);g.connect(c.destination);track(o,g);o.start(t);o.stop(t+d+.01)})}
+ function play(kind){if(document.hidden)return;const c=context();if(!c)return;if(kind==='tap'){if(c.currentTime-lastTap<.045)return;lastTap=c.currentTime;friction(.025,P.rub,.065);modal(P.hit,.045,.025);return}
+  if(kind==='paper'){friction(.13,P.rub,.18);friction(.04,P.rub*.6,.08,.09);return}
+  if(kind==='tick'){modal(P.hit*1.65,.035,.022);return}
+  if(kind==='place'){friction(.035,P.rub*.55,.13);modal(P.hit,.09,.05);return}
+  if(kind==='fail'||kind==='timeup'){modal(P.hit*.7,.16,.055);friction(.055,450,.13,.025);return}
+  if(kind==='reveal'){friction(.18,P.rub,.15);modal(P.hit,.12,.035,.1);return}
+  if(kind==='confirm'){friction(.05,P.rub,.1);modal(P.hit,.12,.045,.035);return}
+  const voice=P.string?pluck:modal;voice(P.note,.28,.045);voice(P.note*1.5,.27,.025,.09);friction(.055,P.rub*.65,.06);
+ }
+ function install(object,allowed,mapping){guards.push(allowed);for(const [name,kind]of Object.entries(mapping))object[name]=()=>{if(allowed())play(kind)};for(const name of ['toggle','setEnabled','setPrivate','stop','drumStop']){if(typeof object[name]!=='function')continue;const old=object[name];object[name]=function(...args){stop();return old.apply(this,args)}}}
+ new MutationObserver(()=>{if(guards.some(allowed=>!allowed()))stop()}).observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['class','hidden']});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});window.addEventListener('pagehide',stop);
+ return{play,stop,install};
+})();
+</script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#E05B2B" />
@@ -365,6 +390,7 @@ const sfx={
  bar:()=>{bell(392,0,.035,-.2);bell(587.3,.2,.03,.2);gong(98,0,.025)},
  exec:()=>{drum(0,.16,60);gong(46,.05,.08);noise(.4,.05,500,0,{to:120,type:'lowpass',wet:.6})},
  chaos:()=>{gong(55,0,.06);drum(0,.12,70);drum(.25,.1,70);drum(.5,.13,65)}};
+TableSound.install(sfx,()=>!muted,{"tap": "tap", "flip": "paper", "good": "success", "bad": "fail", "thud": "place", "gem": "place", "fanfare": "success", "reveal": "reveal", "doom": "fail", "deal": "paper", "pass": "paper", "bar": "confirm", "exec": "fail", "chaos": "fail"});
 const RN={L:'リベラル',F:'ファシスト',H:'ヒトラー'};
 
 /* ---------------- state ---------------- */
@@ -955,5 +981,7 @@ if(saved&&saved.players&&saved.state&&saved.state!=='VICTORY'){
 window.__sh={sfx,get H(){return H},back:goBack,get S(){return S},get running(){return running},L,roleAlert,playerDisplay,F_NONE};
 })();
 </script>
-</body>
+<style id="touch-input-readability">
+@media (any-pointer:coarse){input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,select{font-size:max(16px,1em)}input::placeholder,textarea::placeholder{opacity:1}}
+</style><style id="readability-corrections">:root{--headerFill:#be431a;--textColorHighlight:#f59b75}.lobby h2,#lobby h2{color:#f59b75}.lobby-num{color:#ffb38d}.pps-icon-number.highlight{color:#f59b75}.pps-icon-number.highlight-blue{color:#8dc9d2}.sndlbl,a[data-act]{color:#ffc5a6}</style><style>.lobby h2,#lobby h2{color:#ffc5a6}a{color:#ffc5a6}</style></body>
 </html>
