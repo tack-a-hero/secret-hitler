@@ -1,6 +1,39 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head>
+<head><script>window.SessionUI=(()=>{
+ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const icon=p=>p.icon||(window.GameArt?GameArt.person(p.seat??p.id):'');
+ const rows=players=>players.map(p=>`<button type="button" class="session-seat" data-seat="${esc(p.id)}" ${p.disabled?'disabled':''}><span class="session-face">${icon(p)}</span><span class="session-seat-copy"><b>${esc(p.name)}</b><small>${esc(p.status||(p.done?'確認済み':'タップして確認'))}</small></span><span class="session-chevron" aria-hidden="true">${p.done?'✓':'›'}</span></button>`).join('');
+ let active=null;
+ function viewport(){const v=visualViewport,r=document.documentElement;r.style.setProperty('--visible-h',(v?.height||innerHeight)+'px');r.style.setProperty('--visible-top',(v?.offsetTop||0)+'px');r.style.setProperty('--visible-left',(v?.offsetLeft||0)+'px');r.style.setProperty('--visible-w',(v?.width||innerWidth)+'px');r.classList.toggle('keyboard-open',!!document.activeElement?.matches('input:not([type=range]),textarea,[contenteditable=true]')&&(v?.height||innerHeight)<innerHeight*.82);}
+ function dialog(title,note,body,actions=[]){
+  return new Promise(resolve=>{
+   const prior=document.activeElement,d=document.createElement('dialog');d.className='session-dialog';d.innerHTML=`<div class="session-dialog-head"><h2>${esc(title)}</h2><button type="button" class="session-close" aria-label="閉じる">×</button></div>${note?`<p class="session-note">${esc(note)}</p>`:''}<div class="session-dialog-body">${body}</div><div class="session-actions"></div>`;
+   const finish=value=>{if(!d.isConnected)return;d.close();d.remove();active=null;resolve(value);if(prior?.isConnected)prior.focus({preventScroll:true});};
+   d.querySelector('.session-close').onclick=()=>finish(null);d.addEventListener('cancel',e=>{e.preventDefault();finish(null)});for(const a of actions){const b=document.createElement('button');b.type='button';b.className=a.primary?'session-primary':'session-secondary';b.textContent=a.label;b.onclick=()=>a.action?a.action(d,finish):finish(a.value);d.querySelector('.session-actions').append(b)}
+   d.sessionClose=finish;document.body.append(d);viewport();d.showModal();active=d;d.querySelector('.session-close').focus({preventScroll:true});
+  });
+ }
+ async function confirm(name,note='本人以外は画面を見ないでください。'){
+  return !!(await dialog(name+' さん本人ですか？',note,'<div class="session-cover" aria-hidden="true"><span>PRIVATE</span></div>',[{label:'一覧に戻る',value:false},{label:'本人です・内容を見る',value:true,primary:true}]));
+ }
+ async function pick({title='確認する人を選んでください',note='自分の名前をタップしてください。',players,confirmIdentity=true,cancel=true}){
+  while(true){let pickId;
+   await dialog(title,note,`<div class="session-roster">${rows(players)}</div>`,cancel?[{label:'閉じる',value:null}]:[]).then(v=>{pickId=v});
+   if(pickId==null)return null;const p=players.find(x=>String(x.id)===String(pickId));if(!confirmIdentity||await confirm(p.name))return p.id;
+  }
+ }
+ document.addEventListener('click',e=>{const b=e.target.closest('.session-dialog [data-seat]');if(b&&!b.disabled)b.closest('dialog').sessionClose(b.dataset.seat)});
+ function mount(host,players,onSelect,title='自分の名前を選ぶ'){
+  host.innerHTML=`<h2 class="session-roster-title">${esc(title)}</h2><p class="session-note">自分の名前をタップしてから、本人確認をします。</p><div class="session-roster">${rows(players)}</div>`;
+  host.querySelectorAll('[data-seat]').forEach(b=>b.onclick=async()=>{if(b.disabled)return;const p=players.find(x=>String(x.id)===b.dataset.seat);if(await confirm(p.name))onSelect(p.id)});
+ }
+ function portal(){for(const id of ['dialogOverlay','peekOverlay','resumeGate','resumeOverlay','inAppConfirm','ov','portraitDialog']){const e=document.getElementById(id);if(e&&e.parentElement!==document.body)document.body.append(e)}document.querySelectorAll('.confirm-layer,.modal-layer,.app-confirm-overlay').forEach(e=>{if(e.parentElement!==document.body)document.body.append(e)});}
+ function init(){viewport();portal();new MutationObserver(portal).observe(document.body,{childList:true,subtree:true});document.addEventListener('focusin',viewport);document.addEventListener('focusout',()=>setTimeout(viewport,100));window.addEventListener('resize',viewport);visualViewport?.addEventListener('resize',viewport);visualViewport?.addEventListener('scroll',viewport);const dock=document.getElementById('dockHost');if(dock){const resize=new ResizeObserver(()=>document.documentElement.style.setProperty('--live-dock-height',dock.getBoundingClientRect().height+'px'));resize.observe(dock);}}
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+ return{esc,rows,mount,pick,confirm,dialog,viewport};
+})();
+</script>
 <script>/* Short material sounds. No melodic fanfares; all effects decay within 450 ms. */
 window.TableSound=(()=>{
  const P={"hit": 135, "rub": 1700, "note": 280};
@@ -18,7 +51,7 @@ window.TableSound=(()=>{
   if(kind==='fail'||kind==='timeup'){modal(P.hit*.7,.16,.055);friction(.055,450,.13,.025);return}
   if(kind==='reveal'){friction(.18,P.rub,.15);modal(P.hit,.12,.035,.1);return}
   if(kind==='confirm'){friction(.05,P.rub,.1);modal(P.hit,.12,.045,.035);return}
-  const voice=P.string?pluck:modal;voice(P.note,.28,.045);voice(P.note*1.5,.27,.025,.09);friction(.055,P.rub*.65,.06);
+  friction(.07,P.rub*.7,.14);modal(P.hit*.8,.075,.024,.02);
  }
  function install(object,allowed,mapping){guards.push(allowed);for(const [name,kind]of Object.entries(mapping))object[name]=()=>{if(allowed())play(kind)};for(const name of ['toggle','setEnabled','setPrivate','stop','drumStop']){if(typeof object[name]!=='function')continue;const old=object[name];object[name]=function(...args){stop();return old.apply(this,args)}}}
  new MutationObserver(()=>{if(guards.some(allowed=>!allowed()))stop()}).observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['class','hidden']});
@@ -727,7 +760,8 @@ async function run(){
   switch(S.state){
    case 'ROLES':{
     setStatus('全員が自分の役職を確認しています。');
-    while(S.k<S.players.length){const i=S.k;mark(`${P(i).name}さんの役職確認`);await gate(i,'あなたの秘密の役職を確認します。');await roleAlert(i);S.k++;save()}
+    S.roleSeen??=Array.from({length:S.k||0},(_,i)=>i);
+    while(S.k<S.players.length){const chosen=await SessionUI.pick({title:'役職を確認する人',players:S.players.map((p,i)=>({id:i,name:p.name,icon:`<img src="${PORTRAIT(p.portrait||'p_default')}" alt="">`,done:S.roleSeen.includes(i),disabled:S.roleSeen.includes(i)})),confirmIdentity:false,cancel:false});if(chosen==null)continue;const i=Number(chosen);mark(`${P(i).name}さんの役職確認`);await gate(i,'あなたの秘密の役職を確認します。');await roleAlert(i);S.roleSeen.push(i);S.k=S.roleSeen.length;save()}
     S.state='NOMINATION';S.firstNom=true;break;}
    case 'NOMINATION':{
     mark(`${P(S.pres).name}大統領の首相指名`);
@@ -870,7 +904,7 @@ function renderLobby(){
  document.querySelectorAll('[data-ic]').forEach(el=>el.onclick=()=>iconSelect(+el.dataset.ic));
  $('#plusBtn').onclick=()=>{if(L.players.length>=10)return;L.players.push({name:'',icon:freeIcon()});saveL();renderLobby();const a=document.querySelectorAll('[data-nm]');a[a.length-1].focus()};
  $('#minusBtn').onclick=()=>{if(L.players.length<=5)return;L.players.pop();saveL();renderLobby()};
- $('#startBtn').onclick=()=>{sfx.fanfare();const nm=lobbyNames(),orig=L.players.map(p=>p.name);L.players.forEach((p,i)=>p.name=nm[i]);newGame();L.players.forEach((p,i)=>p.name=orig[i]);saveL();statusText='---';renderGame();run()};
+ $('#startBtn').onclick=()=>{sfx.flip();const nm=lobbyNames(),orig=L.players.map(p=>p.name);L.players.forEach((p,i)=>p.name=nm[i]);newGame();L.players.forEach((p,i)=>p.name=orig[i]);saveL();statusText='---';renderGame();run()};
  $('#rulesBtn').onclick=rules;
  document.querySelectorAll('[data-vm]').forEach(b=>b.onclick=()=>{L.vote=b.dataset.vm;saveL();renderLobby()});
 }
@@ -983,5 +1017,5 @@ window.__sh={sfx,get H(){return H},back:goBack,get S(){return S},get running(){r
 </script>
 <style id="touch-input-readability">
 @media (any-pointer:coarse){input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,select{font-size:max(16px,1em)}input::placeholder,textarea::placeholder{opacity:1}}
-</style><style id="readability-corrections">:root{--headerFill:#be431a;--textColorHighlight:#f59b75}.lobby h2,#lobby h2{color:#f59b75}.lobby-num{color:#ffb38d}.pps-icon-number.highlight{color:#f59b75}.pps-icon-number.highlight-blue{color:#8dc9d2}.sndlbl,a[data-act]{color:#ffc5a6}</style><style>.lobby h2,#lobby h2{color:#ffc5a6}a{color:#ffc5a6}</style></body>
+</style><style id="readability-corrections">:root{--headerFill:#be431a;--textColorHighlight:#f59b75}.lobby h2,#lobby h2{color:#f59b75}.lobby-num{color:#ffb38d}.pps-icon-number.highlight{color:#f59b75}.pps-icon-number.highlight-blue{color:#8dc9d2}.sndlbl,a[data-act]{color:#ffc5a6}</style><style>.lobby h2,#lobby h2{color:#ffc5a6}a{color:#ffc5a6}</style><style id="role-roster-only">.session-dialog{width:480px;padding:22px}.session-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}.session-dialog h2{font-size:21px;line-height:1.6;margin:0;color:var(--ui-ink)}.session-close{width:42px;height:42px;flex:none;background:none;color:var(--ui-ink);border:1px solid var(--ui-line);font-size:24px;cursor:pointer}.session-note{font-size:13px;line-height:1.85;color:var(--ui-muted);margin:12px 0 20px}.session-roster{display:grid;gap:8px}.session-seat{display:flex;align-items:center;width:100%;padding:12px;gap:14px;color:var(--ui-ink);background:var(--ui-panel);border:1px solid var(--ui-line);border-radius:var(--control-radius);text-align:left;min-height:76px;box-shadow:none;cursor:pointer}.session-seat-copy{flex:1;min-width:0}.session-seat b{font-size:16px;line-height:1.6;display:block}.session-seat small{font-size:12px;line-height:1.65;display:block;color:var(--ui-muted);margin-top:3px}.session-face{width:44px;flex:none;display:flex;align-items:center;justify-content:center}.session-face .art-person,.session-face img{width:42px;height:51px;object-fit:cover;border-radius:6px;display:block}.session-chevron{color:var(--ui-accent);font-size:24px;flex:none}.session-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}.session-actions button{min-height:48px;padding:12px 16px;flex:1;min-width:130px;border-radius:var(--control-radius)}.session-roster-title{font-size:22px;line-height:1.7;margin:0;color:var(--ui-ink)}.session-cover{height:135px;display:grid;place-items:center;border-radius:var(--paper-radius);background-image:var(--ui-material);background-size:300% 300%;background-position:var(--ui-material-position);border:1px solid var(--ui-button-line);color:#ffedc7;letter-spacing:.24em} .session-dialog{--ui-panel:#171614;--ui-ink:#f6eddb;--ui-muted:#d0c5af;--ui-line:#71604c;--ui-accent:#e05b2b;--control-radius:10px;--paper-radius:12px;color:#f6eddb;background:#171614;border:1px solid #71604c;font-family:'M PLUS 1p',sans-serif;box-sizing:border-box}.session-dialog *{font-family:inherit}.session-dialog[open]{position:fixed;inset:auto;top:calc(var(--visible-top,0px) + var(--visible-h,100dvh)/2);left:50%;transform:translate(-50%,-50%);margin:0;max-width:calc(100vw - 32px);max-height:calc(var(--visible-h,100dvh) - 32px);overflow:auto}.session-dialog::backdrop{background:#141414cc}.session-dialog button{margin:0!important;font-size:16px;box-shadow:none}.session-dialog .session-seat{background:#27231e!important;color:#f6eddb!important;border-color:#71604c!important}.session-dialog h2{font-family:inherit;color:#f6eddb;font-style:normal;font-size:22px}.session-dialog p,.session-dialog small{color:#d0c5af!important}.session-dialog .session-seat-copy{text-align:left}.session-dialog .session-close{background:#e05b2b;color:white}.session-dialog .session-chevron{color:#efb36f}@media(min-width:700px){.session-dialog:has(.session-roster){width:620px}.session-dialog .session-roster{grid-template-columns:repeat(2,minmax(0,1fr))}}.session-dialog .session-close{font-size:24px!important}</style></body>
 </html>
