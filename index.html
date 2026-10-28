@@ -51,7 +51,7 @@ window.TableSound=(()=>{
   if(kind==='fail'||kind==='timeup'){modal(P.hit*.7,.16,.055);friction(.055,450,.13,.025);return}
   if(kind==='reveal'){friction(.18,P.rub,.15);modal(P.hit,.12,.035,.1);return}
   if(kind==='confirm'){friction(.05,P.rub,.1);modal(P.hit,.12,.045,.035);return}
-  friction(.07,P.rub*.7,.14);modal(P.hit*.8,.075,.024,.02);
+  const voice=P.string?pluck:modal;voice(P.note,.28,.045);voice(P.note*1.5,.27,.025,.09);friction(.055,P.rub*.65,.06);
  }
  function install(object,allowed,mapping){guards.push(allowed);for(const [name,kind]of Object.entries(mapping))object[name]=()=>{if(allowed())play(kind)};for(const name of ['toggle','setEnabled','setPrivate','stop','drumStop']){if(typeof object[name]!=='function')continue;const old=object[name];object[name]=function(...args){stop();return old.apply(this,args)}}}
  new MutationObserver(()=>{if(guards.some(allowed=>!allowed()))stop()}).observe(document.documentElement,{subtree:true,attributes:true,attributeFilter:['class','hidden']});
