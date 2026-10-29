@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head><meta name="app-release" content="mobile-review-20261029-v9"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet"><script>window.SessionUI=(()=>{
+<head><meta name="app-release" content="screen-repair-20261029-v10"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet"><script>window.SessionUI=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const icon=p=>p.icon||(window.GameArt?GameArt.person(p.seat??p.id):'');
  const rows=players=>players.map(p=>`<button type="button" class="session-seat" data-seat="${esc(p.id)}" ${p.disabled?'disabled':''}><span class="session-face">${icon(p)}</span><span class="session-seat-copy"><b>${esc(p.name)}</b><small>${esc(p.status||(p.done?'確認済み':'タップして確認'))}</small></span><span class="session-chevron" aria-hidden="true">${p.done?'✓':'›'}</span></button>`).join('');
@@ -451,7 +451,7 @@ function syncBack(){document.documentElement.classList.toggle('game-in-progress'
 function setAlertCls(c){['#alert','#alert-background','#alert-box'].forEach(s=>{$(s).className=c})}
 function showAlert(html,setup,delay=1000){
  return new Promise(res=>{
-  const box=$('#alert-box'),g0=GEN;box.innerHTML=html;if(S)box.insertAdjacentHTML('afterbegin','<button class="bk-in" data-back aria-label="ひとつ前に戻る">戻る</button>');$('#alert').scrollTop=0;setAlertCls('appear-custom-alert');
+  const box=$('#alert-box'),g0=GEN;box.innerHTML='<div class="sh-alert-body">'+html+'</div><div class="sh-alert-actions"></div>';for(const action of box.querySelectorAll('button[data-ok],button[data-yes],button[data-no],button[data-veto],button[data-all]'))box.querySelector('.sh-alert-actions').append(action);if(S)box.insertAdjacentHTML('afterbegin','<button class="bk-in" data-back aria-label="ひとつ前に戻る"><svg aria-hidden="true" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><path d="m15 5-7 7 7 7"/></svg></button>');$('#alert').scrollTop=0;setAlertCls('appear-custom-alert');
   let done=false;
   const close=(v,d=delay)=>{if(done)return;done=true;setAlertCls('disappear-custom-alert');setTimeout(()=>{if(g0!==GEN)return;box.innerHTML='';res(v)},d*SPEED())};
   setup&&setup(box,close);
@@ -620,8 +620,9 @@ function roleAlert(i){
   team=`<div style="clear:both"></div>${para('ファシストの仲間：')}${playerDisplay({players:mates,viewer:i,showLabels:false,filter:F_NONE})}`}
  else if(p.role==='H')team=`<div style="clear:both"></div>${para('あなたは仲間のファシストを知りません。仲間のファシストはあなたがヒトラーだと知っています。')}`;
  const tm=p.role==='L'?'L':'F';
- return showAlert(`<div><div class="role-banner team-${tm}">${tm==='L'?'リベラル陣営':'ファシスト陣営'}${p.role==='H'?'<small>（あなたはヒトラー）</small>':''}</div><div><h2 id="alert-header" class="left-align role-name-${tm}">あなたの役職：${RN[p.role]}</h2><img id="role" src="${img}" alt="">
-  ${para(T[0])}${para(T[1])}${para(T[2],'highlight')}${team}</div><button data-ok style="clear:both">OK</button></div>`,(box,close)=>{setTimeout(sfx.reveal,150*SPEED());box.querySelector('[data-ok]').onclick=()=>close(true,500)},500);
+ const goal={L:'リベラル政策を完成させるか、ヒトラーを処刑すると勝ち。',F:'ファシスト政策を完成させるか、3枚成立後にヒトラーを首相にすると勝ち。',H:'ファシスト政策を完成させるか、3枚成立後に自分が首相になると勝ち。'}[p.role];
+ return showAlert(`<section class="sh-role-sheet"><div class="role-banner team-${tm}">${tm==='L'?'リベラル陣営':'ファシスト陣営'}</div><h2 class="role-name-${tm}">あなたの役職：${RN[p.role]}</h2><div class="sh-role-summary"><img id="role" src="${img}" alt="${RN[p.role]}"><p>${goal}</p></div><div class="sh-role-team">${team}</div><details><summary>役職の詳しい説明</summary>${para(T[0])}${para(T[1])}${para(T[2],'highlight')}</details><button data-ok>OK</button></section>`,(box,close)=>{setTimeout(sfx.reveal,150*SPEED());box.querySelector('[data-ok]').onclick=()=>close(true,500)},500);
+
 }
 function votingPrompt(v){
  const ch=S.chan,me=P(v).role,cr=P(ch).role;
@@ -766,7 +767,7 @@ async function run(){
    case 'ROLES':{
     setStatus('全員が自分の役職を確認しています。');
     S.roleSeen??=Array.from({length:S.k||0},(_,i)=>i);
-    while(S.k<S.players.length){const chosen=await SessionUI.pick({title:'役職を確認する人',players:S.players.map((p,i)=>({id:i,name:p.name,icon:`<img src="${PORTRAIT(p.portrait||'p_default')}" alt="">`,done:S.roleSeen.includes(i),disabled:S.roleSeen.includes(i)})),confirmIdentity:false,cancel:false});if(chosen==null)continue;const i=Number(chosen);mark(`${P(i).name}さんの役職確認`);await gate(i,'あなたの秘密の役職を確認します。');await roleAlert(i);S.roleSeen.push(i);S.k=S.roleSeen.length;save()}
+    while(S.k<S.players.length){const chosen=await SessionUI.pick({title:'役職を確認する人',players:S.players.map((p,i)=>({id:i,name:p.name,icon:`<img src="${PORTRAIT(p.portrait||'p_default')}" alt="">`,done:S.roleSeen.includes(i),disabled:S.roleSeen.includes(i)})),confirmIdentity:false,cancel:false});if(chosen==null){setStatus('役職確認を一時中断しています。');await new Promise(resolve=>{const host=$('#status-bar');host.insertAdjacentHTML('beforeend','<button id="resumeRoleList">役職一覧を開く</button>');host.querySelector('#resumeRoleList').onclick=resolve;});continue;}const i=Number(chosen);mark(`${P(i).name}さんの役職確認`);await gate(i,'あなたの秘密の役職を確認します。');await roleAlert(i);S.roleSeen.push(i);S.k=S.roleSeen.length;save()}
     S.state='NOMINATION';S.firstNom=true;break;}
    case 'NOMINATION':{
     mark(`${P(S.pres).name}大統領の首相指名`);
@@ -990,17 +991,7 @@ let reloadTouch=null;
 document.addEventListener('touchstart',e=>{
  reloadTouch=e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null;
 },{passive:true});
-document.addEventListener('touchmove',e=>{
- if(!gameInProgress()||!reloadTouch||e.touches.length!==1)return;
- const t=e.touches[0],dy=t.clientY-reloadTouch.y,dx=t.clientX-reloadTouch.x;
- reloadTouch={x:t.clientX,y:t.clientY};
- if(dy<=0||dy<=Math.abs(dx))return;
- const path=e.composedPath?e.composedPath():[];
- const canScrollUp=path.some(el=>el instanceof Element&&
-  el.scrollHeight>el.clientHeight+1&&el.scrollTop>0&&
-  /^(auto|scroll|overlay)$/.test(getComputedStyle(el).overflowY));
- if(!canScrollUp&&(document.scrollingElement?.scrollTop||0)<=0&&e.cancelable)e.preventDefault();
-},{passive:false});
+/* Document overscroll is handled once by ScreenScroll. */
 const endReloadTouch=()=>{reloadTouch=null};
 document.addEventListener('touchend',endReloadTouch,{passive:true});
 document.addEventListener('touchcancel',endReloadTouch,{passive:true});
@@ -1082,5 +1073,92 @@ html body{position:relative!important;inset:auto!important;height:auto!important
 html body .app{position:relative!important;inset:auto!important}
 html body #worldToolbar .world-icon,html body .step-btn{border-radius:50%!important}
 html body button:focus-visible{outline:2px solid var(--ui-accent)!important;outline-offset:3px!important}
-</style></body>
+</style><style id="screen-repair-v10">:root{--app-bar-h:calc(56px + env(safe-area-inset-top,0px));--app-view-h:calc(var(--visible-h,100dvh) - var(--app-bar-h))}
+html,html body{overscroll-behavior-y:none!important;scroll-padding-top:calc(var(--app-bar-h) + 10px)!important}
+html body{display:block!important;padding-top:0!important;margin:0!important;min-height:100dvh!important}
+html body #worldToolbar{position:sticky!important;inset:auto!important;top:0!important;left:auto!important;right:auto!important;margin:0!important;flex:none!important;height:var(--app-bar-h)!important;align-self:stretch!important}
+html body .app,html body #app,html body #appRoot{padding-top:0!important;margin-top:0!important;scroll-padding-top:12px!important}
+html body .badge,html body .tag,html body .private-badge,html body .score-tag{border:0!important;box-shadow:none!important;text-shadow:none!important;background:none!important}
+html body .session-dialog{border-radius:16px!important;box-sizing:border-box!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;min-height:0!important}
+html body .session-dialog:not([open]){display:none!important}
+@layer sessionTypography{html body input::placeholder,html body textarea::placeholder{font-family:inherit!important;font-weight:inherit!important;font-style:normal!important}}
+html body .session-dialog-head{flex:none!important;align-items:center!important;gap:12px!important}
+html body .session-dialog-body{min-height:0!important;overflow:auto!important;overscroll-behavior-y:contain!important;flex:1 1 auto!important}
+html body .session-note{flex:none!important}
+html body .session-actions{flex:none!important;position:relative!important;background:var(--ui-panel)!important;padding:12px 0 0!important;margin-top:8px!important}
+html body button{ text-shadow:none!important }
+html body .btn,html body .button,html body .session-actions button,html body .seg button,html body button.chip{display:inline-flex!important;align-items:center!important;justify-content:center!important;line-height:1.5!important;text-align:center!important;border-radius:14px!important;box-sizing:border-box!important}
+html body .back-slot,html body button[onclick="goBack()"]{display:none!important}
+html body .dialog-actions{position:sticky!important;bottom:0!important;flex:none!important;background:var(--ui-panel)!important;padding:12px 0!important;margin:8px 0 0!important}
+</style><style id="screen-repair-v10">:root,html body{--textFont:var(--headerFont)!important}
+html body{--textColorOnDark:#eee2cf;--textColorOnWhite:#453428;--textColorHighlight:#ff956c;--textColorLiberal:#8dd3e1;--ui-bg:#2d261e!important;--ui-panel:#24201b!important;--ui-ink:#fff0d1!important;--ui-muted:#e0cbae!important;--ui-accent:#ff9a6b!important;--ui-line:#8d7758!important;color:#fff0d1!important}
+html body #lobby-name-list input{background:#f5e5c4!important;color:#453428!important;min-height:44px!important;padding:10px 12px!important;border:0!important;border-radius:10px!important;box-sizing:border-box!important}
+html body #lobby-name-list input::placeholder{color:#72583e!important;opacity:1!important}
+html body #alert-box{color:#eee2cf!important}
+html body #alert-box a,html body #alert-box summary{color:#edcfa2!important}
+html body #alert-box .bv-row{grid-template-columns:32px minmax(0,1fr) 56px 64px!important;gap:6px!important;padding:7px 8px!important;align-items:center!important}
+html body #alert-box .bv-face{width:32px!important;height:40px!important}
+html body #alert-box .bv-name{font-size:14px!important;line-height:1.6!important;text-align:left!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important;overflow-wrap:anywhere!important;color:#fff0d1!important}
+html body #alert-box .bv-b{width:100%!important;min-width:0!important;min-height:44px!important;margin:0!important;padding:8px 4px!important;font-size:16px!important;line-height:1.3!important;box-shadow:none!important;border-radius:12px!important}
+@layer sessionTypography{html body,html body *{font-family:var(--headerFont)!important;font-weight:400!important;font-style:normal!important}}
+html body .session-dialog{border-radius:16px!important;border:0!important;padding:18px!important}
+html body .session-roster .session-seat-copy b{font-size:16px!important;line-height:1.6!important}
+html body .session-roster .session-seat-copy small{font-size:11px!important;line-height:1.6!important}
+html body .game-extra{display:none!important}
+html body #alert{display:flex!important;align-items:center!important;justify-content:center!important;padding:12px!important;box-sizing:border-box!important;overflow:hidden!important;height:var(--visible-h,100dvh)!important;top:var(--visible-top,0px)!important;bottom:auto!important}
+html body #alert-box{display:flex!important;flex-direction:column!important;width:min(820px,100%)!important;min-width:0!important;max-width:100%!important;min-height:0!important;max-height:calc(var(--visible-h,100dvh) - 24px)!important;box-sizing:border-box!important;padding:16px!important;margin:0!important;border:0!important;border-radius:16px!important;overflow:hidden!important}
+html body .sh-alert-body{overflow:auto!important;min-height:0!important;flex:1 1 auto!important;overscroll-behavior:contain!important}
+html body .sh-alert-actions{flex:none!important;display:flex!important;flex-wrap:wrap!important;justify-content:center!important;gap:12px!important;background:var(--alertFill)!important;margin-top:12px!important;padding-top:4px!important}
+html body .sh-alert-actions:empty{display:none!important}
+html body .sh-alert-actions button{min-height:46px!important;margin:0!important;padding:10px 22px!important;font-size:18px!important;border-radius:14px!important;box-shadow:none!important}
+html body #alert-box .bk-in{position:relative!important;align-self:flex-end!important;float:none!important;width:36px!important;height:36px!important;min-height:36px!important;margin:0 0 6px!important;padding:7px!important;box-shadow:none!important;border:0!important;background:transparent!important;font-size:0!important;border-radius:50%!important;flex:none!important}
+html body #alert-box .bk-in:before{display:none!important}
+html body .sh-role-sheet .role-banner{font-size:18px!important;line-height:1.5!important;margin:0 0 12px!important;padding:8px 12px!important;border-radius:12px!important}
+html body .sh-role-sheet h2{font-size:20px!important;line-height:1.6!important;margin:0 0 12px!important}
+html body .sh-role-summary{display:grid!important;grid-template-columns:88px minmax(0,1fr)!important;gap:14px!important;align-items:start!important}
+html body .sh-role-summary #role{width:88px!important;max-width:100%!important;height:auto!important;float:none!important;margin:0!important;border-radius:10px!important}
+html body .sh-role-summary p{font-size:14px!important;line-height:1.85!important;margin:0!important;color:#eee5d3!important}
+html body .sh-role-sheet .sh-role-team{margin-top:12px!important;clear:both!important}
+html body .sh-role-sheet .sh-role-team>p{font-size:12px!important;line-height:1.8!important;margin:0 0 7px!important}
+html body .sh-role-sheet .sh-role-team .player{width:62px!important;margin:0 4px!important}
+html body .sh-role-sheet .sh-role-team #player-display{padding:0!important;margin:0!important}
+html body .sh-role-sheet details{margin-top:12px!important;text-align:left!important}
+html body .sh-role-sheet summary{font-size:13px!important;min-height:30px!important;cursor:pointer;color:#e6caa1!important}
+html body #alert-box .bk-in{color:#e6caa1!important}
+html body .sh-role-team .player-display-container{--tw:72px!important}
+html body .sh-role-sheet details p{font-size:12px!important;line-height:1.85!important;margin:8px 0!important}
+@media (orientation:landscape) and (max-height:600px){html body .sh-role-sheet{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;gap:8px 20px!important}html body .sh-role-sheet>.role-banner{grid-column:1!important;margin:0!important}html body .sh-role-sheet>h2{grid-column:1!important;margin:0!important;font-size:18px!important}html body .sh-role-sheet .sh-role-summary{grid-column:1!important;grid-row:3!important;grid-template-columns:60px minmax(0,1fr)!important}html body .sh-role-sheet .sh-role-summary #role{width:60px!important}html body .sh-role-sheet .sh-role-team{grid-column:2!important;grid-row:1/4!important;margin:0!important}html body .sh-role-sheet details{grid-column:1/3!important;margin:0!important}}
+</style><style id="screen-repair-v10">html body .sh-role-team .player-display{--tw:62px!important;padding:0!important}html body .sh-role-team .player-display-container{--tw:62px!important}html body #alert-box .sh-alert-body>div{min-width:0!important}html body #app{padding-top:0!important}</style><script id="screen-scroll-v10">(()=>{
+ let finger=null;
+ const reset=()=>finger=null;
+ document.addEventListener('touchstart',e=>{finger=e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null},{passive:true,capture:true});
+ document.addEventListener('touchmove',e=>{
+  if(!finger||e.touches.length!==1)return;
+  const t=e.touches[0],dy=t.clientY-finger.y,dx=t.clientX-finger.x;finger={x:t.clientX,y:t.clientY};
+  if(Math.abs(dy)<=Math.abs(dx)||dy<=0)return;
+  // Cancel only a downward drag beyond the top edge, never an ordinary page scroll.
+  const path=e.composedPath?.()||[];let canMove=false;
+  for(const el of path){if(!(el instanceof Element))continue;
+   const st=getComputedStyle(el),root=el===document.scrollingElement;
+   if((root||/auto|scroll|overlay/.test(st.overflowY))&&el.scrollHeight>el.clientHeight+1){
+    if(el.scrollTop>0){canMove=true;break;}
+    // Keep a scrollable panel at its own top edge on older WebKit as well.
+    if(!root)break;
+   }
+  }
+  if(!canMove&&e.cancelable)e.preventDefault();
+ },{passive:false,capture:true});
+ document.addEventListener('touchend',reset,{passive:true,capture:true});document.addEventListener('touchcancel',reset,{passive:true,capture:true});
+ const bar=document.getElementById('worldToolbar');if(bar)document.body.prepend(bar);
+ if(window.WorldControls?.world==='Dixit'){
+  const old=WorldControls.fit;WorldControls.fit=()=>{old?.();const card=document.querySelector('.reveal-layout .flip');if(!card)return;const view=visualViewport;const top=card.getBoundingClientRect().top-(view?.offsetTop||0),dock=document.getElementById('dockHost');const height=Math.max(90,(view?.height||innerHeight)-top-(dock?.offsetHeight||0)-28);const side=Math.floor(Math.min(260,innerWidth*.64,height*.75));const key=side+'px';if(document.documentElement.style.getPropertyValue('--dixit-flip-width')!==key)document.documentElement.style.setProperty('--dixit-flip-width',key);};
+ }
+ if(window.WorldControls?.world==='secret-hitler')WorldControls.menu=async()=>{
+  const actions=[{label:'遊び方',value:'rules'},{label:'閉じる',value:null,primary:true}];
+  if(document.querySelector('.game-extra [data-act=myrole]'))actions.unshift({label:'自分の役職を確認',value:'myrole'},{label:'ゲームを終了',value:'quit'});
+  const value=await SessionUI.dialog('メニュー','','',actions);if(value==='rules')WorldControls.help();else if(value)document.querySelector('.game-extra [data-act='+value+']')?.click();
+ };
+ requestAnimationFrame(()=>{window.SessionUI?.viewport();window.WorldUI?.sync();});document.fonts?.ready.then(()=>window.WorldUI?.sync());
+})();
+</script></body>
 </html>
