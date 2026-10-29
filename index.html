@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head><meta name="app-release" content="design-review-20261029-v8"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet"><script>window.SessionUI=(()=>{
+<head><meta name="app-release" content="mobile-review-20261029-v9"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet"><script>window.SessionUI=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const icon=p=>p.icon||(window.GameArt?GameArt.person(p.seat??p.id):'');
  const rows=players=>players.map(p=>`<button type="button" class="session-seat" data-seat="${esc(p.id)}" ${p.disabled?'disabled':''}><span class="session-face">${icon(p)}</span><span class="session-seat-copy"><b>${esc(p.name)}</b><small>${esc(p.status||(p.done?'確認済み':'タップして確認'))}</small></span><span class="session-chevron" aria-hidden="true">${p.done?'✓':'›'}</span></button>`).join('');
@@ -36,14 +36,33 @@
 </script>
 <script>/* Short material sounds. No melodic fanfares; all effects decay within 450 ms. */
 window.TableSound=(()=>{
- const P=[196, 0.11, 0.08];let ac=null,last=-1;const voices=new Set();
- function context(){try{if(!ac){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;ac=new C()}if(ac.state==='suspended')ac.resume().catch(()=>{});return ac}catch{return null}}
- function stop(){for(const n of voices)try{n.stop()}catch{}voices.clear()}
- function tone(f,d,v,delay=0){const c=context();if(!c)return;const t=c.currentTime+delay;for(const [h,a]of [[1,1],[2,P[2]]]){const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(f*h,t);o.frequency.exponentialRampToValueAtTime(f*h*.985,t+d);g.gain.setValueAtTime(.00001,t);g.gain.exponentialRampToValueAtTime(v*a,t+.012);g.gain.exponentialRampToValueAtTime(.00001,t+d);o.connect(g);g.connect(c.destination);voices.add(o);o.onended=()=>{voices.delete(o);o.disconnect();g.disconnect()};o.start(t);o.stop(t+d+.02)}}
- function play(k){if(k==='silent')return;if(document.hidden||document.querySelector('.session-dialog[open]'))return;const c=context();if(!c)return;if(c.currentTime-last<.065)return;last=c.currentTime;const f=P[0],d=P[1];if(k==='tick')tone(f*.8,.06,.012);else if(k==='fail'||k==='timeup')tone(f*.7,d,.024);else if(k==='success'){tone(f,d,.025);tone(f*1.25,d,.019,.09)}else if(k==='reveal')tone(f*1.12,d*1.3,.024);else if(k==='confirm')tone(f,d,.026);else if(k==='place')tone(f*.9,d*.7,.021);else tone(f*.75,Math.min(d,.09),.014)}
- function install(o,allowed,map){for(const [n,k]of Object.entries(map))o[n]=()=>{if(allowed())play(k)};for(const n of ['toggle','setEnabled','setPrivate','stop','drumStop']){if(typeof o[n]!=='function')continue;const old=o[n];o[n]=function(...a){stop();return old.apply(this,a)}}}
- document.addEventListener('visibilitychange',()=>{if(document.hidden)stop()});window.addEventListener('pagehide',stop);return{play,stop,install};
+ const P=[196, 0.11, 0.08];let ac=null,lastTap=-1,lastCue=-1,lastKind='';const voices=new Set();
+ const enabled=()=>!document.hidden&&(!window.WorldControls||!!WorldControls.on?.());
+ function context(){try{if(!ac||ac.state==='closed'){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;ac=new C();}return ac}catch{return null}}
+ function stop(){for(const o of voices)try{o.stop()}catch{}voices.clear();lastTap=-1;lastCue=-1;lastKind='';}
+ function unlock(){if(!enabled())return;const c=context();if(c&&c.state!=='running')c.resume().catch(()=>{});}
+ function tone(c,f,d,v,delay=0){const at=c.currentTime+delay;for(const[h,a]of[[1,1],[2,P[2]]]){const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(f*h,at);o.frequency.exponentialRampToValueAtTime(f*h*.985,at+d);g.gain.setValueAtTime(.00001,at);g.gain.exponentialRampToValueAtTime(v*a,at+.012);g.gain.exponentialRampToValueAtTime(.00001,at+d);o.connect(g);g.connect(c.destination);voices.add(o);o.onended=()=>{voices.delete(o);o.disconnect();g.disconnect()};o.start(at);o.stop(at+d+.02);}}
+ function schedule(c,k){if(!enabled())return;const now=c.currentTime,f=P[0],d=P[1];
+  if(k==='tap'){if(now-lastTap<.07||now-lastCue<.05)return;lastTap=now;tone(c,f*.78,.075,.03);return;}
+  if(k===lastKind&&now-lastCue<.08)return;
+  // A selection click must not swallow the reveal, confirmation or result cue.
+  if(now-lastTap<.1){for(const o of voices)try{o.stop()}catch{}voices.clear();}
+  lastCue=now;lastKind=k;
+  if(k==='tick')tone(c,f*.8,.065,.022);
+  else if(k==='fail'||k==='timeup'){tone(c,f*.72,d,.038);tone(c,f*.62,d*.7,.026,.10);}
+  else if(k==='success'){tone(c,f,d,.04);tone(c,f*1.25,d,.033,.10);tone(c,f*1.5,d*.8,.022,.19);}
+  else if(k==='reveal'){tone(c,f*.9,d*.9,.03);tone(c,f*1.12,d*1.3,.036,.08);}
+  else if(k==='confirm')tone(c,f,d,.04);
+  else if(k==='place')tone(c,f*.9,Math.max(.09,d*.7),.033);
+  else if(k==='paper'){tone(c,f*.84,.11,.032);tone(c,f,.10,.022,.045);}
+ }
+ function play(k){if(k==='silent'||!enabled())return;const c=context();if(!c)return;if(c.state==='running')schedule(c,k);else c.resume().then(()=>{if(c.state==='running')schedule(c,k)}).catch(()=>{});}
+ function install(o,allowed,map){for(const[n,k]of Object.entries(map))o[n]=()=>{if(allowed())play(k)};for(const n of ['toggle','setEnabled','setPrivate','stop','drumStop']){if(typeof o[n]!=='function')continue;const old=o[n];o[n]=function(...a){stop();return old.apply(this,a)}}}
+ for(const event of ['pointerdown','touchend','keydown'])document.addEventListener(event,unlock,{capture:true,passive:true});
+ document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();else unlock()});window.addEventListener('pageshow',unlock);window.addEventListener('pagehide',stop);
+ return{play,stop,install,unlock};
 })();
+
 </script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -1040,12 +1059,28 @@ html body .session-face{width:46px!important;flex:none!important}
  const bar=document.createElement('nav');bar.id='worldToolbar';bar.setAttribute('aria-label','ゲームの操作');bar.innerHTML='<button class="world-icon" data-world-action="back" aria-label="ひとつ前に戻る">'+svg('back')+'</button><div class="world-caption"></div><div class="world-actions"><button class="world-icon" data-world-action="sound" aria-label="効果音を切り替える">'+svg('sound')+'</button><button class="world-icon" data-world-action="help" aria-label="遊び方">'+svg('help')+'</button><button class="world-icon" data-world-action="menu" aria-label="メニュー">'+svg('menu')+'</button></div>';document.body.append(bar);
  async function rules(){if(C.help){C.help();return}await SessionUI.dialog('遊び方','',C.instructions||'<p>端末を順番に渡して遊びます。</p>',[{label:'閉じる',value:true,primary:true}])}
  async function menu(){if(C.menu){C.menu();return}const actions=[{label:'遊び方',value:'rules'},{label:'閉じる',value:null,primary:true}];if(C.end)actions.unshift({label:'ゲームを終了',value:'end'});const v=await SessionUI.dialog('メニュー','','',actions);if(v==='rules')rules();if(v==='end'&&await SessionUI.dialog('ゲームを終了しますか？','進行中の内容を終了します。','',[{label:'続ける',value:false},{label:'終了する',value:true,primary:true}]))C.end()}
- bar.addEventListener('click',e=>{const b=e.target.closest('[data-world-action]');if(!b)return;const k=b.dataset.worldAction;if(k==='back')C.back?.();if(k==='sound')C.sound?.();if(k==='help')rules();if(k==='menu')void menu();sync()});
+ bar.addEventListener('click',e=>{const b=e.target.closest('[data-world-action]');if(!b)return;const k=b.dataset.worldAction;if(k==='back')C.back?.();if(k==='sound'){C.sound?.();if(C.on?.())TableSound.play('confirm');else TableSound.stop();}if(k==='help')rules();if(k==='menu')void menu();sync()});
  function sync(){C.fit?.();const cap=C.caption?.()||C.name;if(bar.querySelector('.world-caption').textContent!==cap)bar.querySelector('.world-caption').textContent=cap;const on=!!C.on?.(),b=bar.querySelector('[data-world-action=sound]'),key=on?'sound':'mute';if(b.dataset.icon!==key){b.dataset.icon=key;b.innerHTML=svg(key);b.setAttribute('aria-pressed',String(on));b.setAttribute('aria-label',on?'効果音をオフにする':'効果音をオンにする')}const back=bar.querySelector('[data-world-action=back]'),disabled=C.canBack?!C.canBack():false;if(back.disabled!==disabled)back.disabled=disabled;reveal();}
  const seen=new WeakSet();let lastPhase='';
  function reveal(){const selectors=C.results||[];for(const sel of selectors){for(const e of document.querySelectorAll(sel)){if(!e.getBoundingClientRect().height||seen.has(e))continue;seen.add(e);e.classList.add('result-entrance');if(C.name!=='Secret Hitler'&&!matchMedia('(prefers-reduced-motion: reduce)').matches){const f=document.createElement('div');f.className='world-reveal-fx';f.dataset.world=C.world;f.innerHTML=C.fx||'<i></i><i></i><i></i>';document.body.append(f);setTimeout(()=>f.remove(),850)}}}}
  let queued=false;const observer=new MutationObserver(()=>{if(queued)return;queued=true;requestAnimationFrame(()=>{queued=false;sync()})});observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','hidden','disabled','aria-pressed']});
- document.addEventListener('click',e=>{const b=e.target.closest('button,a[role=button],summary');if(!b||b.disabled||!C.on?.()||C.private?.()||b.closest('.portrait-dialog'))return;TableSound.play('tap')},true);
+ document.addEventListener('click',e=>{const b=e.target.closest('button,a[role=button],summary');if(!b||b.disabled||!C.on?.())return;TableSound.play('tap')},true);
  window.addEventListener('resize',sync);visualViewport?.addEventListener('resize',sync);sync();window.WorldUI={sync,rules};
-})();</script></body>
+})();</script><style id="mobile-review-v9">/* Text labels remain plain; real actions retain a visible, rounded touch surface. */
+html body button:not(.session-seat):not(.portrait-choice):not(.art-card):not(.ballot-art):not(.group-art):not(.rp):not(.layer-person):not(.role):not(.fl):not(.cc){text-align:center!important;vertical-align:middle!important;box-sizing:border-box!important}
+html body .btn,html body .button,html body .tool,html body .step-btn,html body .icon-btn,html body .chip,html body .cand,html body .seg button,html body .session-actions button{display:inline-flex!important;align-items:center!important;justify-content:center!important;gap:8px!important;line-height:1.5!important;white-space:normal!important;border-radius:14px!important}
+html body button>svg{flex:none;vertical-align:middle}
+html body .session-close,html body .portrait-close{display:grid!important;place-items:center!important;padding:0!important;width:44px!important;height:44px!important;min-width:44px!important;min-height:44px!important;line-height:1!important;z-index:2!important;position:relative!important;pointer-events:auto!important;touch-action:manipulation!important}
+html body .session-dialog-head{align-items:center!important}
+html body .win-note,html body .judge-verdict,html body .judge-verdict .verdict{border:0!important;background:none!important;box-shadow:none!important;outline:0!important;border-radius:0!important}
+html body .win-note{padding:16px 0!important;line-height:1.8!important;display:block!important;color:var(--ui-ink)!important}
+html body .note,html body .alert.info{border-radius:14px!important}
+html body #worldToolbar{top:0!important;bottom:auto!important;margin-top:0!important;transform:none!important;isolation:isolate!important}
+/* Safari can collapse its own controls when the document, rather than a fixed app, scrolls. */
+html{height:auto!important;min-height:100%!important;overflow-x:clip!important;overflow-y:auto!important;overscroll-behavior-y:auto!important}
+html body{position:relative!important;inset:auto!important;height:auto!important;min-height:100dvh!important;overflow-x:clip!important;overflow-y:visible!important;overscroll-behavior-y:auto!important}
+html body .app{position:relative!important;inset:auto!important}
+html body #worldToolbar .world-icon,html body .step-btn{border-radius:50%!important}
+html body button:focus-visible{outline:2px solid var(--ui-accent)!important;outline-offset:3px!important}
+</style></body>
 </html>
