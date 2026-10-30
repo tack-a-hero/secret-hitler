@@ -15,7 +15,10 @@
   });
  }
  async function confirm(name,note='本人以外は画面を見ないでください。'){
-  return !!(await dialog(name+' さん本人ですか？',note,'<div class="session-cover" aria-hidden="true"><span>PRIVATE</span></div>',[{label:'一覧に戻る',value:false},{label:'本人です・内容を見る',value:true,primary:true}]));
+  const pending=dialog('本人確認',note,'<button type="button" class="session-cover session-open-private"><span class="session-private-name">'+esc(name)+' さん</span><span>本人です・内容を見る</span></button>',[{label:'一覧に戻る',value:false}]);
+  const cover=document.querySelector('dialog.session-dialog[open] .session-open-private');
+  if(cover){cover.onclick=()=>cover.closest('dialog').sessionClose(true);cover.focus({preventScroll:true})}
+  return !!(await pending);
  }
  async function pick({title='確認する人を選んでください',note='自分の名前をタップしてください。',players,confirmIdentity=true,cancel=true}){
   while(true){let pickId;
@@ -342,7 +345,7 @@ body:not(.has-back) [data-back]{display:none!important}
 .seg button{color:var(--textColorOnDark,#bbb)!important;background:#3b342e!important}
 .seg button.on{background:var(--buttonFill,#e05a2b)!important;color:var(--headerTextColor,#fff)!important}
 </style>
-<link rel="icon" href="mobile-assets/table-room-v12.svg"><link rel="apple-touch-icon" sizes="180x180" href="mobile-assets/table-room-v12-180.png"><link rel="manifest" href="mobile-assets/app-v12.webmanifest"><meta name="theme-color" content="#1d1c18"></head>
+<link rel="icon" href="mobile-assets/table-room-v12.svg"><link rel="apple-touch-icon" sizes="180x180" href="mobile-assets/table-room-v12-180.png"><link rel="manifest" href="mobile-assets/app-v12.webmanifest"><meta name="theme-color" content="#1d1c18"><style id="single-tap-private">html body .session-open-private{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:100%;min-height:160px;padding:24px 16px;font:inherit;color:inherit;cursor:pointer;touch-action:manipulation}html body .session-open-private .session-private-name{margin:0;font-size:20px;font-weight:700}html body .session-open-private:focus-visible{outline:2px solid currentColor;outline-offset:3px}</style></head>
 <body>
 <div id="app"></div>
 <div id="alert"><div id="alert-background"></div><div id="alert-box"></div></div>
