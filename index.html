@@ -3,7 +3,7 @@
 <head><meta name="app-release" content="screen-repair-20261029-v10"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet"><script>window.SessionUI=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const icon=p=>p.icon||(window.GameArt?GameArt.person(p.seat??p.id):'');
- const rows=players=>players.map(p=>`<button type="button" class="session-seat" data-seat="${esc(p.id)}" ${p.disabled?'disabled':''}><span class="session-face">${icon(p)}</span><span class="session-seat-copy"><b>${esc(p.name)}</b><small>${esc(p.status||(p.done?'確認済み':'タップして確認'))}</small></span><span class="session-chevron" aria-hidden="true">${p.done?'✓':'›'}</span></button>`).join('');
+ const rows=players=>players.map(p=>`<button type="button" class="session-seat ${p.done?'is-confirmed':''}" data-seat="${esc(p.id)}" ${p.disabled?'disabled':''}><span class="session-face">${icon(p)}</span><span class="session-seat-copy"><b>${esc(p.name)}</b><small>${esc(p.status||(p.done?'確認済み':'タップして確認'))}</small></span><span class="session-chevron" aria-hidden="true">${p.done?'✓':'›'}</span></button>`).join('');
  let active=null;
  function viewport(){const v=visualViewport,r=document.documentElement;r.style.setProperty('--visible-h',(v?.height||innerHeight)+'px');r.style.setProperty('--visible-top',(v?.offsetTop||0)+'px');r.style.setProperty('--visible-left',(v?.offsetLeft||0)+'px');r.style.setProperty('--visible-w',(v?.width||innerWidth)+'px');r.classList.toggle('keyboard-open',!!document.activeElement?.matches('input:not([type=range]),textarea,[contenteditable=true]')&&(v?.height||innerHeight)<innerHeight*.82);}
  function dialog(title,note,body,actions=[]){
@@ -19,13 +19,13 @@
  }
  async function pick({title='確認する人を選んでください',note='自分の名前をタップしてください。',players,confirmIdentity=true,cancel=true}){
   while(true){let pickId;
-   await dialog(title,note,`<div class="session-roster">${rows(players)}</div>`,cancel?[{label:'閉じる',value:null}]:[]).then(v=>{pickId=v});
+   await dialog(title,note,`<div class="session-progress" role="status"><span class="session-progress-dots" aria-hidden="true">${players.map(p=>`<i class="${p.done?'done':''}"></i>`).join('')}</span><span>${players.filter(p=>p.done).length} / ${players.length} 確認済み</span></div><div class="session-roster">${rows(players)}</div>`,cancel?[{label:'閉じる',value:null}]:[]).then(v=>{pickId=v});
    if(pickId==null)return null;const p=players.find(x=>String(x.id)===String(pickId));if(!confirmIdentity||await confirm(p.name))return p.id;
   }
  }
  document.addEventListener('click',e=>{const b=e.target.closest('.session-dialog [data-seat]');if(b&&!b.disabled)b.closest('dialog').sessionClose(b.dataset.seat)});
  function mount(host,players,onSelect,title='自分の名前を選ぶ'){
-  host.innerHTML=`<h2 class="session-roster-title">${esc(title)}</h2><p class="session-note">自分の名前をタップしてから、本人確認をします。</p><div class="session-roster">${rows(players)}</div>`;
+  host.innerHTML=`<h2 class="session-roster-title">${esc(title)}</h2><p class="session-note">自分の名前をタップしてから、本人確認をします。</p><div class="session-progress" role="status"><span class="session-progress-dots" aria-hidden="true">${players.map(p=>`<i class="${p.done?'done':''}"></i>`).join('')}</span><span>${players.filter(p=>p.done).length} / ${players.length} 確認済み</span></div><div class="session-roster">${rows(players)}</div>`;
   host.querySelectorAll('[data-seat]').forEach(b=>b.onclick=async()=>{if(b.disabled)return;const p=players.find(x=>String(x.id)===b.dataset.seat);if(await confirm(p.name))onSelect(p.id)});
  }
  function portal(){for(const id of ['dialogOverlay','peekOverlay','resumeGate','resumeOverlay','inAppConfirm','ov','portraitDialog']){const e=document.getElementById(id);if(e&&e.parentElement!==document.body)document.body.append(e)}document.querySelectorAll('.confirm-layer,.modal-layer,.app-confirm-overlay').forEach(e=>{if(e.parentElement!==document.body)document.body.append(e)});}
@@ -66,11 +66,11 @@ window.TableSound=(()=>{
 </script>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="theme-color" content="#E05B2B" />
+
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="format-detection" content="telephone=no" />
-<title>Secret Hitler Online</title>
+<title>Secret Hitler | TABLE ROOM</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
@@ -342,7 +342,7 @@ body:not(.has-back) [data-back]{display:none!important}
 .seg button{color:var(--textColorOnDark,#bbb)!important;background:#3b342e!important}
 .seg button.on{background:var(--buttonFill,#e05a2b)!important;color:var(--headerTextColor,#fff)!important}
 </style>
-</head>
+<link rel="icon" href="mobile-assets/table-room-v12.svg"><link rel="apple-touch-icon" sizes="180x180" href="mobile-assets/table-room-v12-180.png"><link rel="manifest" href="mobile-assets/app-v12.webmanifest"><meta name="theme-color" content="#1d1c18"></head>
 <body>
 <div id="app"></div>
 <div id="alert"><div id="alert-background"></div><div id="alert-box"></div></div>
@@ -1159,6 +1159,35 @@ html body .sh-role-sheet details p{font-size:12px!important;line-height:1.85!imp
   const value=await SessionUI.dialog('メニュー','','',actions);if(value==='rules')WorldControls.help();else if(value)document.querySelector('.game-extra [data-act='+value+']')?.click();
  };
  requestAnimationFrame(()=>{window.SessionUI?.viewport();window.WorldUI?.sync();});document.fonts?.ready.then(()=>window.WorldUI?.sync());
+})();
+</script><style id="mobile-viewport-v12">/* One document scroll owner. The browser toolbar is outside the visual viewport. */
+:root{--mobile-visible:100svh;--mobile-safe-bottom:env(safe-area-inset-bottom,0px);--mobile-header:calc(56px + env(safe-area-inset-top,0px));--app-view-h:calc(var(--mobile-visible) - var(--mobile-header))}
+@supports(height:100dvh){:root{--mobile-visible:100dvh}}
+html{height:auto!important;min-height:100%!important;overflow-x:clip!important;overflow-y:auto!important;overscroll-behavior-y:none!important;background:var(--ui-bg,#f8f8f6)!important}
+html body{position:relative!important;inset:auto!important;height:auto!important;min-height:var(--mobile-visible)!important;overflow:visible!important;overscroll-behavior-y:none!important;padding:0!important}
+html body #worldToolbar{position:sticky!important;top:0!important;height:var(--mobile-header)!important;min-height:0!important;margin:0!important;flex:none!important}
+html body .app,html body #app,html body #appRoot{margin-top:0!important;padding-top:0!important;scroll-padding-top:8px!important}
+html body .session-dialog{top:calc(var(--visible-top,0px) + env(safe-area-inset-top,0px) + 8px)!important;bottom:auto!important;left:0!important;right:0!important;transform:none!important;translate:none!important;max-height:calc(var(--mobile-visible) - env(safe-area-inset-top,0px) - var(--mobile-safe-bottom) - 16px)!important;margin:0 auto!important}
+html body .session-seat.is-confirmed{background:#343638!important;border-color:#626468!important;opacity:1!important;box-shadow:none!important}
+html body .session-seat.is-confirmed .session-face{filter:grayscale(1)!important;opacity:.42!important}
+html body .session-seat.is-confirmed .session-seat-copy b{color:#a6aaad!important}
+html body .session-seat.is-confirmed .session-seat-copy small,html body .session-seat.is-confirmed .session-chevron{color:#d1d4d5!important}
+html body .session-seat.is-confirmed .session-chevron{font-size:24px!important}
+html body .session-seat.is-confirmed:disabled{opacity:1!important}
+html body .session-progress{display:flex;align-items:center;gap:8px;font-size:12px;line-height:1.5;margin:0 0 8px;color:var(--ui-ink,inherit)}
+html body .session-progress-dots{display:inline-flex;gap:4px;flex-wrap:wrap}
+html body .session-progress-dots i{width:7px;height:7px;border:1px solid currentColor;border-radius:50%;box-sizing:border-box}
+html body .session-progress-dots i.done{background:currentColor}
+html body button{touch-action:manipulation}
+/* Plain information is typography, not a collection of outlined labels. */
+html body .badge,html body .tag,html body .private-badge,html body .score-tag,html body .pill,html body .eyebrow,html body .contract-label,html body .turn-meta,html body .role-boundary{border:0!important;outline:0!important;box-shadow:none!important;background:none!important;border-radius:0!important}
+html body .session-seat-copy b,html body .session-seat-copy small{border:0!important;outline:0!important;background:none!important;box-shadow:none!important}
+</style><script>/* visualViewport is also reduced by the keyboard; zoom must remain usable. */
+(()=>{
+ let queued=false;
+ function sync(){queued=false;const v=window.visualViewport;if(v&&Math.abs(v.scale-1)>.01)return;const r=document.documentElement;const value=(v?.height||innerHeight)+'px';if(r.style.getPropertyValue('--mobile-visible')!==value)r.style.setProperty('--mobile-visible',value);const bar=document.getElementById('worldToolbar');if(bar){const h=bar.getBoundingClientRect().height+'px';if(r.style.getPropertyValue('--mobile-header')!==h)r.style.setProperty('--mobile-header',h)}}
+ const schedule=()=>{if(!queued){queued=true;requestAnimationFrame(sync)}};
+ addEventListener('resize',schedule);addEventListener('pageshow',schedule);visualViewport?.addEventListener('resize',schedule);visualViewport?.addEventListener('scroll',schedule);sync();
 })();
 </script></body>
 </html>
