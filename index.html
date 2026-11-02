@@ -501,7 +501,7 @@ function busySet(){
  switch(S.state){
   case 'NOMINATION':case 'LEG_PRES':case 'VETO':case 'PP_PEEK':case 'PP_SE':case 'PP_EXEC':case 'PP_INV':case 'POST':b.add(S.pres);break;
   case 'LEG_CHAN':b.add(S.chan);break;
-  case 'VOTING':S.players.forEach((p,i)=>{if(p.alive&&!(i in S.votes))b.add(i)});break;
+  case 'VOTING':break;
  }
  return b;
 }
@@ -641,21 +641,10 @@ function votingPrompt(v){
 }
 function policyDisplay(pols,allow,sel){return `<div class="legislative-policy-container">${pols.map((c,k)=>`<img class="legislative-policy${allow?' selectable'+(k===sel?' selected':''):''}" data-k="${k}" src="${c==='L'?IMG.polL:IMG.polF}" alt="${RN[c]}政策">`).join('')}</div>`}
 function bindPolicies(box,pols,onSel){let sel=null;const slot=box.querySelector('.pol-slot');const draw=()=>{slot.innerHTML=policyDisplay(pols,true,sel);slot.querySelectorAll('[data-k]').forEach(el=>el.onclick=()=>{sel=+el.dataset.k;draw();onSel(sel)})};draw()}
-function bulkVotePrompt(){
- const alive=S.players.map((_,i)=>i).filter(i=>P(i).alive);const v={};
- return showAlert(`<div class="bulk-vote">${buttonPrompt({label:'投票の入力',
-  header:para(`${nm(S.pres)} 大統領が ${nm(S.chan)} を首相に指名しました。`)+para('「せーの」で全員同時に Ja!（賛成）か Nein（反対）を示し、結果をまとめて入力してください。')+(S.fas>=3?para('ヒトラーが首相に選ばれると、ファシストの勝利です！','highlight'):'')+(S.tracker===2?para('否決されると、山札の一番上の政策がただちに制定されます。','highlight'):''),
-  body:`<div class="bv-list">${alive.map(i=>`<div class="bv-row"><img class="bv-face" src="${PORTRAIT(P(i).icon||'p_default')}" alt=""><span class="bv-name">${esc(P(i).name)}</span><button class="bv-b ja" data-bj="${i}">Ja!</button><button class="bv-b nein" data-bn="${i}">Nein</button></div>`).join('')}</div>`,
-  buttons:`<div class="bv-acts"><button data-all>残りを全員 Ja!</button><button data-ok disabled>集計する</button></div>`})}</div>`,(box,close)=>{
-   const draw=()=>{const c=Object.keys(v).length;
-    box.querySelectorAll('[data-bj]').forEach(b=>b.classList.toggle('on',v[+b.dataset.bj]===true));
-    box.querySelectorAll('[data-bn]').forEach(b=>b.classList.toggle('on',v[+b.dataset.bn]===false));
-    const ok=box.querySelector('[data-ok]');ok.disabled=c<alive.length;ok.textContent=c<alive.length?`集計する（${c}/${alive.length}）`:'集計する'};
-   box.querySelectorAll('[data-bj]').forEach(b=>b.onclick=()=>{v[+b.dataset.bj]=true;sfx.tap&&sfx.tap();draw()});
-   box.querySelectorAll('[data-bn]').forEach(b=>b.onclick=()=>{v[+b.dataset.bn]=false;sfx.tap&&sfx.tap();draw()});
-   box.querySelector('[data-all]').onclick=()=>{alive.forEach(i=>{if(!(i in v))v[i]=true});draw()};
-   box.querySelector('[data-ok]').onclick=()=>{if(Object.keys(v).length===alive.length)close({...v},500)};draw()},500);
+function tableGovernmentPrompt(){
+ return showAlert(buttonPrompt({label:'政府案の投票結果',header:para(`${nm(S.pres)} 大統領・${nm(S.chan)} 首相の政府案です。`)+para('テーブルで投票し、最終結果だけ入力してください。'),buttons:'<button data-yes>承認</button><button data-no>却下</button>'}),(box,close)=>{box.querySelector('[data-yes]').onclick=()=>close(true,0);box.querySelector('[data-no]').onclick=()=>close(false,0)},0);
 }
+
 function presPrompt(pols){
  return showAlert(buttonPrompt({label:'立法会議',header:para('捨てる政策を1枚選んでください。残りの政策は首相に渡されます。'),body:'<div class="pol-slot"></div>',buttons:'<button data-ok disabled>捨てる</button>'}),(box,close)=>{
   let s=null;bindPolicies(box,pols,v=>{s=v;box.querySelector('[data-ok]').disabled=false});box.querySelector('[data-ok]').onclick=()=>{if(s!=null)close(s,500)}},500);
@@ -708,7 +697,7 @@ function newGame(){
  const roles=shuffle(['H',...Array(f).fill('F'),...Array(l).fill('L')]);const r=rnd(n);
  S={players:L.players.map((p,i)=>({name:p.name,icon:p.icon,role:roles[i],alive:true,inv:false})),deck:shuffle([...Array(6).fill('L'),...Array(11).fill('F')]),discard:[],
   lib:0,fas:0,tracker:0,pres:r,rot:r,chan:null,lastPres:null,lastChan:null,seNext:null,votes:{},vetoOccurred:false,state:'ROLES',k:0,
-  presChoices:null,chanChoices:null,target:null,winType:null,firstNom:true,voteMode:L.vote==='secret'?'secret':'open'};
+  presChoices:null,chanChoices:null,target:null,winType:null,firstNom:true,voteMode:'result'};
  D={lib:0,fas:0,tracker:0,draw:17,discard:0};
  H=[{label:'ロビー',sig:'lobby',lobby:true}];saveH();
 }
@@ -777,20 +766,17 @@ async function run(){
     await eventBar('首相の指名');
     setStatus('大統領が首相を指名するのを待っています。');renderPlayers();
     const sel=await selectPrompt({label:'指名',header:`<div>${para(`<span class="highlight">${nm(S.pres)}</span> 大統領、次の首相を指名してください。`)}${S.fas>=3?para('ヒトラーが指名され、首相に選ばれるとファシストの勝利です！','highlight'):''}</div>`,filter:F_TERM,exclude:S.pres});
-    S.chan=sel;S.votes={};S.state='VOTING';S.voteBar=true;break;}
+    S.chan=sel;S.votes={};S.governmentApproved=null;S.state='VOTING';S.voteBar=true;break;}
    case 'VOTING':{
-    renderPlayers();
-    if(S.voteBar){await eventBar('投票');S.voteBar=false;save()}
-    setStatus('全員の投票を待っています。');renderPlayers();
-    if(S.voteMode!=='secret'){mark('投票の入力');const r=await bulkVotePrompt();if(r==null)break;S.votes=r;save();renderPlayers()}
-    for(let i=0;i<S.players.length;i++){
-     if(!P(i).alive||(i in S.votes))continue;
-     mark(`${P(i).name}さんの投票`);await gate(i,'政府への投票を行います。');
-     const v=await votingPrompt(i);S.votes[i]=v;save();renderPlayers();
+    S.voteBar=false;
+    if(typeof S.governmentApproved!=='boolean'){
+      const old=Object.values(S.votes||{}),alive=S.players.filter(p=>p.alive).length;
+      if(old.length===alive)S.governmentApproved=old.filter(Boolean).length>old.length/2;
+      else{mark('政府案の最終投票結果');S.governmentApproved=await tableGovernmentPrompt()}
     }
-    await showVotes();
-    const vals=Object.values(S.votes),y=vals.filter(v=>v).length;
-    if(y>vals.length-y){
+    const approved=S.governmentApproved;S.votes={};votesShown=-1;save();renderPlayers();
+    setStatus(approved?'政府案は承認されました':'政府案は却下されました');approved?sfx.good():sfx.bad();
+    if(approved){
      if(S.fas>=3&&P(S.chan).role==='H'){S.state='VICTORY';S.winType='FAS_ELECTION';break}
      S.lastPres=S.pres;S.lastChan=S.chan;S.tracker=0;D.tracker=0;updateBoard();
      reshuffleIfNeeded();S.presChoices=S.deck.splice(0,3);S.state='LEG_PRES';S.legBar=true;
@@ -895,8 +881,7 @@ function renderLobby(){
    <div class="row" style="justify-content:space-between"><p id="lobby-player-count-text">プレイヤー (${n}/10)</p>
     <div><button id="minusBtn" style="margin:10px 6px;min-width:3em" ${n<=5?'disabled':''}>−</button><button id="plusBtn" style="margin:10px 6px;min-width:3em" ${n>=10?'disabled':''}>＋</button></div></div>
    <div id="lobby-name-list">${L.players.map((p,i)=>`<div class="lobby-name-row"><span class="lobby-num">${i+1}</span><img src="${PORTRAIT(p.icon)}" data-ic="${i}" class="lobby-icon" alt=""><input data-nm="${i}" maxlength="12" value="${esc(p.name||'')}" placeholder="プレイヤー${i+1}" autocomplete="off" enterkeyhint="next"></div>`).join('')}</div>
-   <div class="vote-mode"><span>投票方法</span><div class="seg"><button data-vm="open" class="${L.vote==='secret'?'':'on'}">まとめて入力</button><button data-vm="secret" class="${L.vote==='secret'?'on':''}">端末を回す</button></div><small>${L.vote==='secret'?'1人ずつ端末を回して秘密に投票します。':'全員で一斉に示した票を、1台でまとめて入力します。'}</small></div>
-   <div class="lobby-buttons">
+   <p class="table-vote-note">投票はテーブルで行い、承認・却下の結果だけを入力します。</p><div class="lobby-buttons">
     <button id="startBtn">ゲーム開始</button>
     <button id="rulesBtn">遊び方</button>
    </div>
@@ -930,8 +915,8 @@ function rules(){
  okPrompt({label:'遊び方',body:`<div class="rules">
   <p>プレイヤーはリベラル、ファシスト、そして隠れたヒトラーに分かれます。リベラルは協力して隠れたヒトラーを見つけ出し、ファシストはヒトラーを権力の座に押し上げようとします。</p>
   <h2>勝利条件</h2><p><span class="highlight-blue">リベラル</span>：リベラル政策を5枚制定する／ヒトラーを処刑する。</p><p><span class="highlight">ファシスト</span>：ファシスト政策を6枚制定する／ファシスト政策3枚以降にヒトラーを首相に選ぶ。</p>
-  <h2>ラウンドの流れ</h2><p>① 大統領が首相を指名（前回の首相と、生存者6人以上なら前回の大統領は指名不可）。</p><p>② 生きている全員が Ja!/Nein で投票。過半数の Ja! で可決。否決なら選挙トラッカーが進み、3回で山札の一番上が強制的に制定されます。</p><p>③ 大統領が3枚引いて1枚捨て、首相が2枚から1枚を制定します。</p><p>④ ファシスト政策の枠に大統領権限があれば発動します（上3枚の確認・所属の調査・特別選挙・処刑）。ファシスト政策5枚以降は拒否権が使えます。</p><p>⑤ 大統領が「任期終了」を押すと次のラウンドへ。</p>
-  <h2>1台版について</h2><p>秘密の操作（役職・投票・立法・調査・確認）の前には「端末を渡してください」と表示されます。本人以外は画面を見ないでください。</p>
+  <h2>ラウンドの流れ</h2><p>① 大統領が首相を指名（前回の首相と、生存者6人以上なら前回の大統領は指名不可）。</p><p>② 生きている全員が Ja!/Nein で投票。過半数の Ja! で可決。アプリには承認・却下の最終結果だけ入力します。否決なら選挙トラッカーが進み、3回で山札の一番上が強制的に制定されます。</p><p>③ 大統領が3枚引いて1枚捨て、首相が2枚から1枚を制定します。</p><p>④ ファシスト政策の枠に大統領権限があれば発動します（上3枚の確認・所属の調査・特別選挙・処刑）。ファシスト政策5枚以降は拒否権が使えます。</p><p>⑤ 大統領が「任期終了」を押すと次のラウンドへ。</p>
+  <h2>1台版について</h2><p>秘密の操作（役職・立法・調査・確認）の前には「端末を渡してください」と表示されます。本人以外は画面を見ないでください。</p>
   <p style="font-size:calc(9px + 1vmin)">原作「Secret Hitler」© Goat, Wolf, &amp; Cabbage／Secret Hitler Online © ShrimpCryptid（CC BY-NC-SA 4.0）。この版は非営利の翻案で、原作者とは関係ありません。</p></div>`,button:'閉じる',delay:500});
 }
 async function myRole(){
@@ -1192,5 +1177,12 @@ html body .session-seat-copy b,html body .session-seat-copy small{border:0!impor
  const schedule=()=>{if(!queued){queued=true;requestAnimationFrame(sync)}};
  addEventListener('resize',schedule);addEventListener('pageshow',schedule);visualViewport?.addEventListener('resize',schedule);visualViewport?.addEventListener('scroll',schedule);sync();
 })();
-</script><style id="portrait-radius-v18">html body .art-person,html body .portrait-choice,html body .session-face,html body .session-face img,html body .lobby-icon,html body img.player-icon{border-radius:6px!important}html body .portrait-choice,html body .session-face{overflow:hidden!important}</style></body>
+</script><style id="portrait-radius-v18">html body .art-person,html body .portrait-choice,html body .session-face,html body .session-face img,html body .lobby-icon,html body img.player-icon{border-radius:6px!important}html body .portrait-choice,html body .session-face{overflow:hidden!important}</style><style id="tabletop-ux-v20">@layer tabletopFinish{
+ html body #alert-box:has([data-yes]):has([data-no]) .sh-alert-actions{display:flex!important;gap:12px!important}
+ html body #alert-box [data-yes],html body #alert-box [data-no]{min-height:48px!important;flex:1!important;text-align:center!important}
+ html body #alert-box [data-yes]{background:#326a7a!important;color:#fff4df!important;border-color:#326a7a!important}
+ html body #alert-box [data-no]{background:transparent!important;color:#f1a079!important;border:2px solid #b95832!important}
+ html body .table-vote-note{font-size:14px;line-height:1.6;margin:12px 0}
+}
+</style></body>
 </html>
