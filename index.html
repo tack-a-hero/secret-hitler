@@ -1,6 +1,9 @@
 <!DOCTYPE html>
 <html lang="ja">
-<head><meta name="app-release" content="screen-repair-20261029-v10"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet"><script>window.SessionUI=(()=>{
+<head><style id="separated-controls-v25">@layer separatedControlsV25{
+ html body .world-actions{gap:8px!important}
+ html body :is(button.btn,button.tool,.session-dialog button,.session-cover button){border-radius:6px!important}
+}</style><meta name="app-release" content="screen-repair-20261029-v10"><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP&display=swap" rel="stylesheet"><script>window.SessionUI=(()=>{
  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const icon=p=>p.icon||(window.GameArt?GameArt.person(p.seat??p.id):'');
  const rows=players=>players.map(p=>`<button type="button" class="session-seat ${p.done?'is-confirmed':''}" data-seat="${esc(p.id)}" ${p.disabled?'disabled':''}><span class="session-face">${icon(p)}</span><span class="session-seat-copy"><b>${esc(p.name)}</b><small>${esc(p.status||(p.done?'確認済み':'タップして確認'))}</small></span><span class="session-chevron" aria-hidden="true">${p.done?'✓':'›'}</span></button>`).join('');
